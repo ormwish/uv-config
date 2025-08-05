@@ -13,6 +13,8 @@ from dynaconf import Dynaconf
 from uv_config.core import load_any, dump_toml, ToolUv, Pyproject
 
 app = typer.Typer(add_completion=False)
+from typing import List
+from tomlkit import dumps, item
 
 
 @app.command(help="Проверить конфигурацию на валидность")
@@ -97,6 +99,46 @@ def merge(
 
     dump_toml({"tool": {"uv": merged}}, toml_file)
     typer.echo(f"✅ Конфигурация записана в {toml_file}")
+
+@app.command(help="Вывести текущую [tool.uv] с аннотациями описаний")
+def annotate(
+    path: Path = typer.Argument("pyproject.toml", help="путь к pyproject.toml")
+):
+    """
+    Показывает все поля tool.uv, текущие значения и их описание (из docstring моделей).
+    """
+    data = load_any(path)
+    uv_cfg = data.get("tool", {}).get("uv", {})
+
+    schema = ToolUv.model_json_schema(by_alias=True)
+    props = schema["properties"]
+
+    lines: List[str] = ["# Annotated [tool.uv] configuration\n"]
+    for key, meta in props.items():
+        title = meta.get("title", key)
+        desc = meta.get("description", "").strip()
+        enum = meta.get("enum")
+        default = ToolUv.model_fields.get(key.replace("-", "_")).default
+        val = uv_cfg.get(key, default)
+
+        lines.append(f"## {title}")
+        if desc:
+            for dline in desc.splitlines():
+                lines.append(f"# {dline}")
+        if enum:
+            lines.append(f"# допустимые: {enum}")
+        if default is not None:
+            lines.append(f"# значение по умолчанию: {default}")
+
+        # Сериализуем текущее значение
+        if isinstance(val, (dict, list)):
+            from tomlkit import dumps, item
+            repr_val = dumps(item(val)).strip()
+        else:
+            repr_val = repr(val)
+        lines.append(f"{key} = {repr_val}\n")
+
+    typer.echo("\n".join(lines))
 
 
 if __name__ == "__main__":
