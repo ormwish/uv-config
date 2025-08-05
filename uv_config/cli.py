@@ -100,45 +100,59 @@ def merge(
     dump_toml({"tool": {"uv": merged}}, toml_file)
     typer.echo(f"✅ Конфигурация записана в {toml_file}")
 
-@app.command(help="Вывести текущую [tool.uv] с аннотациями описаний")
+@app.command(help="Вывести всю конфигурацию [tool.uv] с аннотациями")
 def annotate(
-    path: Path = typer.Argument("pyproject.toml", help="путь к pyproject.toml")
+    path: Path = typer.Argument("pyproject.toml", help="путь к pyproject.toml|yaml|json")
 ):
     """
-    Показывает все поля tool.uv, текущие значения и их описание (из docstring моделей).
+    Для каждой опции [tool.uv] показывает:
+      • описание (из Pydantic docstring),
+      • enum-значения (если есть),
+      • значение по умолчанию,
+      • текущее значение в файле.
     """
-    data = load_any(path)
-    uv_cfg = data.get("tool", {}).get("uv", {})
+    # Загружаем файл
+    raw = load_any(path)
+    cfg = raw.get("tool", {}).get("uv", {})
 
+    # Берём JSON Schema модели
     schema = ToolUv.model_json_schema(by_alias=True)
-    props = schema["properties"]
+    props = schema.get("properties", {})
 
-    lines: List[str] = ["# Annotated [tool.uv] configuration\n"]
+    out: List[str] = []
+    out.append("# Annotated [tool.uv] configuration\n")
+
     for key, meta in props.items():
         title = meta.get("title", key)
         desc = meta.get("description", "").strip()
         enum = meta.get("enum")
-        default = ToolUv.model_fields.get(key.replace("-", "_")).default
-        val = uv_cfg.get(key, default)
+        default = ToolUv.model_fields[key.replace("-", "_")].default
+        current = cfg.get(key, default)
 
-        lines.append(f"## {title}")
+        # Заголовок опции
+        out.append(f"## {title} `{key}`")
+
+        # Описание
         if desc:
-            for dline in desc.splitlines():
-                lines.append(f"# {dline}")
+            out.append(f"> {desc}")
+
+        # Enum
         if enum:
-            lines.append(f"# допустимые: {enum}")
+            out.append(f"> Возможные: {enum}")
+
+        # Default
         if default is not None:
-            lines.append(f"# значение по умолчанию: {default}")
+            out.append(f"> По умолчанию: {default!r}")
 
-        # Сериализуем текущее значение
-        if isinstance(val, (dict, list)):
-            from tomlkit import dumps, item
-            repr_val = dumps(item(val)).strip()
+        # Текущее значение
+        if isinstance(current, (dict, list)):
+            val_repr = dumps(item(current)).strip()
         else:
-            repr_val = repr(val)
-        lines.append(f"{key} = {repr_val}\n")
+            val_repr = repr(current)
+        out.append(f"> Текущее: {val_repr}\n")
 
-    typer.echo("\n".join(lines))
+    typer.echo("\n".join(out))
+
 
 
 if __name__ == "__main__":
