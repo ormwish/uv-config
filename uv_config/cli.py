@@ -153,6 +153,41 @@ def annotate(
 
     typer.echo("\n".join(out))
 
+@app.command(help="Показать полный список опций с описаниями, enum, default и current")
+def full(
+    toml_path: Path = typer.Argument("pyproject.toml", help="путь к pyproject.toml|yaml|json")
+):
+    """
+    Для каждой опции [tool.uv] выводит:
+      • title (название)
+      • описание из Pydantic-модели
+      • enum-значения, если есть
+      • значение по умолчанию
+      • текущее значение из конфигурации
+    """
+    # 1. Получаем JSON-схему
+    schema = json.loads(ToolUv.model_json_schema())
+    props = schema.get("properties", {})
+
+    # 2. Загружаем текущий конфиг
+    raw = load_any(toml_path)
+    cfg = raw.get("tool", {}).get("uv", {})
+
+    # 3. Выводим
+    for key, meta in props.items():
+        title = meta.get("title", key)
+        desc  = meta.get("description", "").strip()
+        enum  = meta.get("enum")
+        default = meta.get("default")
+        current = cfg.get(key, default)
+
+        typer.secho(f"{title} (`{key}`)", fg="cyan", bold=True)
+        if desc:
+            typer.secho(f"  → {desc}", fg="white")
+        if enum:
+            typer.secho(f"  • enum: {enum}", fg="yellow")
+        typer.secho(f"  • default: {default!r}", fg="green")
+        typer.secho(f"  • current: {current!r}\n", fg="magenta")
 
 
 if __name__ == "__main__":
