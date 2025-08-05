@@ -1,0 +1,36 @@
+[project]
+name = "uv-config"
+version = "0.1.0"
+description = "CLI-tool for managing [tool.uv] configs with Pydantic + Dynaconf"
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+  { name = "Your Name", email = "you@example.com" }
+]
+license = { text = "MIT" }
+keywords = ["uv", "config", "cli", "pydantic", "dynaconf"]
+classifiers = [
+  "Programming Language :: Python :: 3",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent"
+]
+
+dependencies = [
+  "typer[all]>=0.12",
+  "pydantic>=2.0",
+  "tomlkit>=0.12",
+  "ruamel.yaml>=0.18",
+  "dynaconf[yaml]>=3.0"
+]
+
+[project.scripts]
+uv-config = "uv_config.cli:app"
+
+[tool.uv]
+# Минимальные настройки для самого uv-config (если требуется)
+package = false
+managed = false
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
